@@ -29,14 +29,15 @@ resource "random_id" "bucket_suffix" {
   byte_length = 8
 }
 
-# REMEDIATION: Public access block enabled to prevent public write access
+# REMEDIATION: Public access block configured to prevent public write access via ACLs
+# block_public_policy is set to false to allow the read-only bucket policy below
 resource "aws_s3_bucket_public_access_block" "misconfigured_pab" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
 
   block_public_acls       = true
-  block_public_policy     = true
+  block_public_policy     = false
   ignore_public_acls      = true
-  restrict_public_buckets = true
+  restrict_public_buckets = false
 }
 
 # REMEDIATION: Changed from public-read-write to private to block public write access
