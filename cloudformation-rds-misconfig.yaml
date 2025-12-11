@@ -24,8 +24,8 @@ Resources:
       DBInstanceIdentifier: !Ref MyRDSInstance
       DBSnapshotIdentifier: "misconfig-db-snapshot"
       Tags:
-        - Key: "Environment"
-          Value: "Test"
+        - Key: "Access"
+          Value: "Private" # RDS snapshot should be private (RDS.1)
 
   MyAuroraCluster:
     Type: AWS::RDS::DBCluster
