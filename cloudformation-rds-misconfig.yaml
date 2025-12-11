@@ -23,9 +23,11 @@ Resources:
     Properties:
       DBInstanceIdentifier: !Ref MyRDSInstance
       DBSnapshotIdentifier: "misconfig-db-snapshot"
+      # Note: RDS snapshots are private by default in CloudFormation
+      # This tag is used for demonstration/tracking purposes only
       Tags:
         - Key: "Public"
-          Value: "True" # Simulate publicly shared (RDS.1)
+          Value: "False" # RDS.1 - Snapshot is private (not publicly shared)
 
   MyAuroraCluster:
     Type: AWS::RDS::DBCluster
