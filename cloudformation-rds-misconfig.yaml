@@ -25,7 +25,7 @@ Resources:
       DBSnapshotIdentifier: "misconfig-db-snapshot"
       Tags:
         - Key: "Public"
-          Value: "True" # Simulate publicly shared (RDS.1)
+          Value: "False" # RDS.1 - Snapshot is private (not publicly shared)
 
   MyAuroraCluster:
     Type: AWS::RDS::DBCluster
