@@ -24,8 +24,8 @@ Resources:
       DBInstanceIdentifier: !Ref MyRDSInstance
       DBSnapshotIdentifier: "misconfig-db-snapshot"
       Tags:
-        - Key: "Public"
-          Value: "True" # Simulate publicly shared (RDS.1)
+        - Key: "Environment"
+          Value: "Test"
 
   MyAuroraCluster:
     Type: AWS::RDS::DBCluster
