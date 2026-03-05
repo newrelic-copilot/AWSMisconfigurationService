@@ -19,11 +19,74 @@ data "aws_vpc" "default" {
   default = true
 }
 
-# Get default subnet
+# Get default subnet (public) – used for the NAT gateway
 data "aws_subnet" "default" {
   vpc_id            = data.aws_vpc.default.id
   availability_zone = "us-east-1a"
   default_for_az    = true
+}
+
+# Get the internet gateway attached to the default VPC (needed for NAT gateway)
+data "aws_internet_gateway" "default" {
+  filter {
+    name   = "attachment.vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+# Private subnet – EC2 instances will run here (no auto-assign public IP)
+resource "aws_subnet" "private" {
+  vpc_id                  = data.aws_vpc.default.id
+  cidr_block              = "172.31.128.0/20"
+  availability_zone       = "us-east-1a"
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name        = "PrivateSubnet"
+    Environment = "SecurityTesting"
+  }
+}
+
+# Elastic IP for the NAT gateway
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = {
+    Name        = "NatGatewayEIP"
+    Environment = "SecurityTesting"
+  }
+}
+
+# NAT gateway in the public subnet – provides outbound internet access for private instances
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = data.aws_subnet.default.id
+
+  tags = {
+    Name        = "NatGateway"
+    Environment = "SecurityTesting"
+  }
+}
+
+# Route table for the private subnet, routing egress traffic through the NAT gateway
+resource "aws_route_table" "private" {
+  vpc_id = data.aws_vpc.default.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
+
+  tags = {
+    Name        = "PrivateRouteTable"
+    Environment = "SecurityTesting"
+  }
+}
+
+# Associate the private subnet with the private route table
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
 }
 
 # MISCONFIGURATION 1: Security group with overly permissive rules
@@ -115,11 +178,11 @@ resource "aws_instance" "misconfigured_ec2" {
   ami           = data.aws_ami.amazon_linux.id
   instance_type = "t2.micro"
 
-  # MISCONFIGURATION: Use default subnet (public)
-  subnet_id = data.aws_subnet.default.id
+  # Placed in private subnet – no direct internet exposure
+  subnet_id = aws_subnet.private.id
 
-  # MISCONFIGURATION: Associate public IP
-  associate_public_ip_address = true
+  # Public IPv4 address disabled – access the internet via NAT gateway only
+  associate_public_ip_address = false
 
   # MISCONFIGURATION: Use overly permissive security group
   vpc_security_group_ids = [aws_security_group.misconfigured_sg.id]
@@ -236,12 +299,12 @@ output "instance_id" {
   value = aws_instance.misconfigured_ec2.id
 }
 
-output "public_ip" {
-  value = aws_instance.misconfigured_ec2.public_ip
+output "private_ip" {
+  value = aws_instance.misconfigured_ec2.private_ip
 }
 
-output "public_dns" {
-  value = aws_instance.misconfigured_ec2.public_dns
+output "nat_gateway_ip" {
+  value = aws_eip.nat.public_ip
 }
 
 output "security_group_id" {
@@ -249,5 +312,5 @@ output "security_group_id" {
 }
 
 output "security_warnings" {
-  value = "WARNING: This EC2 instance is intentionally misconfigured with public access, weak security groups, unencrypted storage, and hardcoded credentials!"
+  value = "WARNING: This EC2 instance is intentionally misconfigured with weak security groups, unencrypted storage, and hardcoded credentials!"
 }
