@@ -2,6 +2,35 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Intentionally misconfigured AWS Security Group for security misconfiguration demonstration."
 
 Resources:
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cloudformation-sg-service-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: cloudformation-sg-service-role-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcs
+                Resource: '*'
+
+
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -35,3 +64,8 @@ Resources:
         # Allow all outbound (default, but often flagged if not restricted)
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
+
+Outputs:
+  CloudFormationServiceRoleArn:
+    Description: "ARN of the CloudFormation service role for this stack"
+    Value: !GetAtt CloudFormationServiceRole.Arn

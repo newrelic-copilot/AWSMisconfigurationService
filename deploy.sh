@@ -124,7 +124,8 @@ cf_deploy_s3() {
     if [[ $confirm == "yes" ]]; then
         aws cloudformation create-stack \
             --stack-name misconfigured-s3-stack \
-            --template-body file://cloudformation-s3-misconfigured.yaml
+            --template-body file://cloudformation-s3-misconfigured.yaml \
+            --capabilities CAPABILITY_NAMED_IAM
         echo "✅ CloudFormation stack deployment initiated. Check AWS console for progress."
         echo "✅ Remember to destroy the stack when done!"
     else

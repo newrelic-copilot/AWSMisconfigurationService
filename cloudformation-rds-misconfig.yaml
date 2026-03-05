@@ -2,6 +2,48 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Intentionally misconfigured AWS RDS resources for security misconfiguration demonstration."
 
 Resources:
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cloudformation-rds-service-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: cloudformation-rds-service-role-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rds:CreateDBInstance
+                  - rds:DeleteDBInstance
+                  - rds:ModifyDBInstance
+                  - rds:DescribeDBInstances
+                  - rds:CreateDBSnapshot
+                  - rds:DeleteDBSnapshot
+                  - rds:DescribeDBSnapshots
+                  - rds:CreateDBCluster
+                  - rds:DeleteDBCluster
+                  - rds:ModifyDBCluster
+                  - rds:DescribeDBClusters
+                  - rds:AddTagsToResource
+                  - rds:ListTagsForResource
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupEgress
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcs
+                Resource: '*'
+
+
   MyRDSInstance:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -47,3 +89,8 @@ Resources:
           FromPort: 3306
           ToPort: 3306
           CidrIp: 0.0.0.0/0   # Open to the world (bad practice)
+
+Outputs:
+  CloudFormationServiceRoleArn:
+    Description: "ARN of the CloudFormation service role for this stack"
+    Value: !GetAtt CloudFormationServiceRole.Arn
