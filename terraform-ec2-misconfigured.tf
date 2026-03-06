@@ -31,13 +31,13 @@ resource "aws_security_group" "misconfigured_sg" {
   name_prefix = "misconfigured-sg-"
   vpc_id      = data.aws_vpc.default.id
 
-  # Allow SSH from anywhere
+  # Allow SSH from trusted admin CIDR only
   ingress {
-    description = "SSH from anywhere"
+    description = "SSH from trusted admin CIDR"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
   # Allow HTTP from anywhere
@@ -58,30 +58,30 @@ resource "aws_security_group" "misconfigured_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow RDP from anywhere
+  # Allow RDP from trusted admin CIDR only
   ingress {
-    description = "RDP from anywhere"
+    description = "RDP from trusted admin CIDR"
     from_port   = 3389
     to_port     = 3389
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
-  # Allow all database ports from anywhere
+  # Allow all database ports from trusted CIDR only
   ingress {
-    description = "MySQL from anywhere"
+    description = "MySQL from trusted CIDR"
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
   ingress {
-    description = "PostgreSQL from anywhere"
+    description = "PostgreSQL from trusted CIDR"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
   # Allow all outbound traffic

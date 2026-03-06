@@ -7,30 +7,24 @@ Resources:
     Properties:
       GroupDescription: "SG with multiple misconfigs"
       SecurityGroupIngress:
-        # 4.2 - RDP open to the world
+        # 4.2 - RDP restricted to trusted admin CIDR
         - IpProtocol: tcp
           FromPort: 3389
           ToPort: 3389
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3389
-          ToPort: 3389
-          CidrIpv6: "::/0"
-        # EC2.18 - Unrestricted incoming traffic on unauthorized ports
+          CidrIp: 10.0.0.0/8
+          Description: "RDP allowed only from trusted admin CIDR"
+        # EC2.18 - Port 8080 restricted to trusted CIDR
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
-          CidrIp: 0.0.0.0/0
-        # More: SSH open to the world (should be restricted)
+          CidrIp: 10.0.0.0/8
+          Description: "Port 8080 allowed only from trusted CIDR"
+        # SSH restricted to trusted admin CIDR
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
-        # More: All traffic open (should never be allowed)
-        - IpProtocol: -1
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: 0.0.0.0/0
+          CidrIp: 10.0.0.0/8
+          Description: "SSH allowed only from trusted admin CIDR"
       SecurityGroupEgress:
         # Allow all outbound (default, but often flagged if not restricted)
         - IpProtocol: -1
