@@ -1,6 +1,16 @@
 # Intentionally Misconfigured EC2 Instance - FOR SECURITY TESTING ONLY
 # This file contains multiple security misconfigurations and should NOT be used in production
 
+variable "trusted_admin_cidr" {
+  description = "Trusted administrator CIDR range for SSH and RDP access (e.g. 203.0.113.0/24)"
+  type        = string
+
+  validation {
+    condition     = can(cidrhost(var.trusted_admin_cidr, 0))
+    error_message = "trusted_admin_cidr must be a valid CIDR block."
+  }
+}
+
 terraform {
   required_providers {
     aws = {
@@ -31,13 +41,13 @@ resource "aws_security_group" "misconfigured_sg" {
   name_prefix = "misconfigured-sg-"
   vpc_id      = data.aws_vpc.default.id
 
-  # Allow SSH from anywhere
+  # Allow SSH from trusted admin network only
   ingress {
-    description = "SSH from anywhere"
+    description = "SSH from trusted admin network"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.trusted_admin_cidr]
   }
 
   # Allow HTTP from anywhere
@@ -58,13 +68,13 @@ resource "aws_security_group" "misconfigured_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow RDP from anywhere
+  # Allow RDP from trusted admin network only
   ingress {
-    description = "RDP from anywhere"
+    description = "RDP from trusted admin network"
     from_port   = 3389
     to_port     = 3389
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.trusted_admin_cidr]
   }
 
   # Allow all database ports from anywhere
