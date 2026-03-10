@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  S3 bucket – public write access remediated.
+  Block Public Access is enabled, the bucket ACL is Private, and the bucket
+  policy denies write operations from non-IAM principals.
+  Remaining misconfigurations (no encryption, no versioning) are retained for
+  security-testing purposes only and should be addressed separately.
+
+Resources:
+  MisconfiguredBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Private ACL – no public read or write access
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: MisconfiguredBucket
+        - Key: Environment
+          Value: SecurityTesting
+        - Key: Purpose
+          Value: Security testing – remaining misconfigurations only
+
+  # Deny write access from any principal outside this AWS account.
+  # Legitimate IAM users, roles, and service principals within the account
+  # retain their existing access; only anonymous / cross-account public
+  # write is blocked.
+  MisconfiguredBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MisconfiguredBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyPublicWrite
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub 'arn:aws:s3:::${MisconfiguredBucket}/*'
+            Condition:
+              StringNotEquals:
+                aws:PrincipalAccount: !Sub '${AWS::AccountId}'
+
+Outputs:
+  BucketName:
+    Value: !Ref MisconfiguredBucket
+    Description: Name of the S3 bucket
+  SecurityNote:
+    Value: >
+      NOTE: Public write access has been remediated. Block Public Access is
+      enabled and the bucket ACL is Private.

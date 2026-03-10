@@ -1,5 +1,8 @@
-# Intentionally Misconfigured S3 Bucket - FOR SECURITY TESTING ONLY
-# This file contains multiple security misconfigurations and should NOT be used in production
+# S3 Bucket - public write access remediated
+# Block Public Access is enabled, ACL is private, and the bucket policy denies
+# write operations from non-IAM principals.
+# Remaining misconfigurations (no encryption, no versioning) are retained for
+# security-testing purposes only and should be addressed separately.
 
 terraform {
   required_providers {
@@ -13,6 +16,8 @@ terraform {
 provider "aws" {
   region = "us-east-2"
 }
+
+data "aws_caller_identity" "current" {}
 
 # Misconfigured S3 Bucket with public access
 resource "aws_s3_bucket" "misconfigured_bucket" {
@@ -29,21 +34,21 @@ resource "random_id" "bucket_suffix" {
   byte_length = 8
 }
 
-# MISCONFIGURATION 1: Public access block disabled (allows public access)
+# Block all public access to prevent public write (and read) exposure
 resource "aws_s3_bucket_public_access_block" "misconfigured_pab" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-# MISCONFIGURATION 2: Public read/write ACL
+# Private ACL – no public read or write access
 resource "aws_s3_bucket_acl" "misconfigured_acl" {
   depends_on = [aws_s3_bucket_ownership_controls.s3_bucket_acl_ownership]
   bucket     = aws_s3_bucket.misconfigured_bucket.id
-  acl        = "public-read-write"
+  acl        = "private"
 }
 
 resource "aws_s3_bucket_ownership_controls" "s3_bucket_acl_ownership" {
@@ -67,7 +72,9 @@ resource "aws_s3_bucket_versioning" "misconfigured_versioning" {
 # MISCONFIGURATION 5: No access logging
 # (Logging is intentionally not configured)
 
-# MISCONFIGURATION 6: Public bucket policy allowing full access
+# Bucket policy – deny write access from any principal outside this AWS account.
+# Legitimate IAM users, roles, and service principals within the account retain
+# their existing access; only anonymous / cross-account public write is blocked.
 resource "aws_s3_bucket_policy" "misconfigured_policy" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
 
@@ -75,19 +82,21 @@ resource "aws_s3_bucket_policy" "misconfigured_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadWrite"
-        Effect    = "Allow"
+        Sid    = "DenyPublicWrite"
+        Effect = "Deny"
         Principal = "*"
         Action = [
-          "s3:GetObject",
           "s3:PutObject",
           "s3:DeleteObject",
-          "s3:ListBucket"
         ]
         Resource = [
-          aws_s3_bucket.misconfigured_bucket.arn,
           "${aws_s3_bucket.misconfigured_bucket.arn}/*",
         ]
+        Condition = {
+          StringNotEquals = {
+            "aws:PrincipalAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       },
     ]
   })
@@ -103,5 +112,5 @@ output "bucket_domain_name" {
 }
 
 output "security_warnings" {
-  value = "WARNING: This bucket is intentionally misconfigured with public access, no encryption, and no versioning!"
+  value = "NOTE: Public write access has been remediated. Block Public Access is enabled and the bucket ACL is private."
 }
