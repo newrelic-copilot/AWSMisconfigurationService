@@ -204,6 +204,11 @@ resource "aws_iam_role" "misconfigured_role" {
 }
 
 # MISCONFIGURATION: Attach overly permissive policy
+# REMEDIATION: Removed iam:* and replaced with least-privilege IAM actions.
+# Broad iam:* permissions (especially iam:CreateAccessKey, iam:UpdateAccessKey,
+# iam:ListAccessKeys) enable persistence tactics by allowing attackers to create
+# and manage long-lived credentials. Only read-only IAM actions needed by EC2
+# are retained.
 resource "aws_iam_role_policy" "misconfigured_policy" {
   name = "MisconfiguredPolicy"
   role = aws_iam_role.misconfigured_role.id
@@ -216,8 +221,15 @@ resource "aws_iam_role_policy" "misconfigured_policy" {
         Action = [
           "s3:*",
           "ec2:*",
-          "iam:*",
           "rds:*"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:GetUser",
+          "iam:GetAccessKeyLastUsed"
         ]
         Resource = "*"
       },
