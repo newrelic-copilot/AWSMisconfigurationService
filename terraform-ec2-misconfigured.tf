@@ -26,69 +26,27 @@ data "aws_subnet" "default" {
   default_for_az    = true
 }
 
-# MISCONFIGURATION 1: Security group with overly permissive rules
+# Security group with least-privilege rules
 resource "aws_security_group" "misconfigured_sg" {
-  name_prefix = "misconfigured-sg-"
-  vpc_id      = data.aws_vpc.default.id
+  name_prefix            = "misconfigured-sg-"
+  vpc_id                 = data.aws_vpc.default.id
+  revoke_rules_on_delete = true
 
-  # Allow SSH from anywhere
+  # Allow inbound HTTPS only from a trusted CIDR range
   ingress {
-    description = "SSH from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow HTTP from anywhere
-  ingress {
-    description = "HTTP from anywhere"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow HTTPS from anywhere
-  ingress {
-    description = "HTTPS from anywhere"
+    description = "Inbound HTTPS from trusted network"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["10.0.0.0/8"]
   }
 
-  # Allow RDP from anywhere
-  ingress {
-    description = "RDP from anywhere"
-    from_port   = 3389
-    to_port     = 3389
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow all database ports from anywhere
-  ingress {
-    description = "MySQL from anywhere"
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "PostgreSQL from anywhere"
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow all outbound traffic
+  # Allow outbound HTTPS only
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "Outbound HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 

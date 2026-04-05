@@ -1,37 +1,20 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Intentionally misconfigured AWS Security Group for security misconfiguration demonstration."
+Description: "AWS Security Group with restricted least-privilege rules."
 
 Resources:
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: "SG with multiple misconfigs"
+      GroupDescription: "Default VPC security group with restricted rules"
       SecurityGroupIngress:
-        # 4.2 - RDP open to the world
+        # Allow inbound HTTPS only from a trusted CIDR range
         - IpProtocol: tcp
-          FromPort: 3389
-          ToPort: 3389
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 3389
-          ToPort: 3389
-          CidrIpv6: "::/0"
-        # EC2.18 - Unrestricted incoming traffic on unauthorized ports
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
-        # More: SSH open to the world (should be restricted)
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        # More: All traffic open (should never be allowed)
-        - IpProtocol: -1
-          FromPort: 0
-          ToPort: 65535
-          CidrIp: 0.0.0.0/0
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.0.0/8
       SecurityGroupEgress:
-        # Allow all outbound (default, but often flagged if not restricted)
-        - IpProtocol: -1
+        # Allow outbound HTTPS only
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
           CidrIp: 0.0.0.0/0
