@@ -26,19 +26,10 @@ data "aws_subnet" "default" {
   default_for_az    = true
 }
 
-# MISCONFIGURATION 1: Security group with overly permissive rules
+# Security group with least-privilege network access
 resource "aws_security_group" "misconfigured_sg" {
   name_prefix = "misconfigured-sg-"
   vpc_id      = data.aws_vpc.default.id
-
-  # Allow SSH from anywhere
-  ingress {
-    description = "SSH from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   # Allow HTTP from anywhere
   ingress {
@@ -58,32 +49,6 @@ resource "aws_security_group" "misconfigured_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow RDP from anywhere
-  ingress {
-    description = "RDP from anywhere"
-    from_port   = 3389
-    to_port     = 3389
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow all database ports from anywhere
-  ingress {
-    description = "MySQL from anywhere"
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "PostgreSQL from anywhere"
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   # Allow all outbound traffic
   egress {
     from_port   = 0
@@ -93,9 +58,11 @@ resource "aws_security_group" "misconfigured_sg" {
   }
 
   tags = {
-    Name        = "MisconfiguredSecurityGroup"
-    Environment = "SecurityTesting"
-    Purpose     = "Intentionally vulnerable for testing"
+    Name             = "MisconfiguredSecurityGroup"
+    Environment      = "SecurityTesting"
+    Purpose          = "Intentionally vulnerable for testing"
+    SecurityRisk     = "high"
+    MonitoringTarget = "true"
   }
 }
 
@@ -124,62 +91,50 @@ resource "aws_instance" "misconfigured_ec2" {
   # MISCONFIGURATION: Use overly permissive security group
   vpc_security_group_ids = [aws_security_group.misconfigured_sg.id]
 
-  # MISCONFIGURATION: No key pair specified (but still accessible)
-  # key_name = "your-key-pair"
+  # Attach IAM instance profile
+  iam_instance_profile = aws_iam_instance_profile.misconfigured_profile.name
 
-  # MISCONFIGURATION: IMDSv1 enabled (should use IMDSv2 only)
+  # IMDSv2 enforced to prevent SSRF-based credential theft
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "optional" # Should be "required" for IMDSv2
-    http_put_response_hop_limit = 2
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
   }
 
-  # MISCONFIGURATION: User data with sensitive information
   user_data = base64encode(<<-EOF
     #!/bin/bash
     yum update -y
     yum install -y httpd
     systemctl start httpd
     systemctl enable httpd
-    
-    # SECURITY ISSUE: Hardcoded credentials in user data
-    export DB_PASSWORD="SuperSecretPassword123!"
-    export API_KEY="AKIA1234567890ABCDEF"
-    
+
     # Create a simple web page
-    echo "<h1>Misconfigured Web Server</h1>" > /var/www/html/index.html
-    echo "<p>This server is intentionally misconfigured for security testing.</p>" >> /var/www/html/index.html
-    echo "<p>Database Password: $DB_PASSWORD</p>" >> /var/www/html/index.html
-    
-    # SECURITY ISSUE: Disable firewall
-    systemctl stop firewalld
-    systemctl disable firewalld
-    
-    # SECURITY ISSUE: Create user with weak password
-    useradd -m testuser
-    echo "testuser:password123" | chpasswd
+    echo "<h1>Web Server</h1>" > /var/www/html/index.html
+    echo "<p>This server is configured for security testing.</p>" >> /var/www/html/index.html
   EOF
   )
 
-  # MISCONFIGURATION: Unencrypted root volume
+  # Encrypted root volume
   root_block_device {
     volume_type           = "gp2"
     volume_size           = 8
-    encrypted             = false # Should be true
+    encrypted             = true
     delete_on_termination = true
   }
 
-  # MISCONFIGURATION: No monitoring enabled
-  monitoring = false
+  # Detailed monitoring enabled
+  monitoring = true
 
   tags = {
-    Name        = "MisconfiguredEC2Instance"
-    Environment = "SecurityTesting"
-    Purpose     = "Intentionally vulnerable for testing"
+    Name             = "MisconfiguredEC2Instance"
+    Environment      = "SecurityTesting"
+    Purpose          = "Intentionally vulnerable for testing"
+    SecurityRisk     = "high"
+    MonitoringTarget = "true"
   }
 }
 
-# MISCONFIGURATION 3: IAM role with overly broad permissions
+# MISCONFIGURATION 3: IAM role — hardened to least-privilege trust policy
 resource "aws_iam_role" "misconfigured_role" {
   name = "MisconfiguredEC2Role"
 
@@ -197,13 +152,15 @@ resource "aws_iam_role" "misconfigured_role" {
   })
 
   tags = {
-    Name        = "MisconfiguredRole"
-    Environment = "SecurityTesting"
-    Purpose     = "Intentionally vulnerable for testing"
+    Name             = "MisconfiguredRole"
+    Environment      = "SecurityTesting"
+    Purpose          = "Intentionally vulnerable for testing"
+    SecurityRisk     = "high"
+    MonitoringTarget = "true"
   }
 }
 
-# MISCONFIGURATION: Attach overly permissive policy
+# Least-privilege policy: only CloudWatch Logs permissions required for the workload
 resource "aws_iam_role_policy" "misconfigured_policy" {
   name = "MisconfiguredPolicy"
   role = aws_iam_role.misconfigured_role.id
@@ -214,10 +171,9 @@ resource "aws_iam_role_policy" "misconfigured_policy" {
       {
         Effect = "Allow"
         Action = [
-          "s3:*",
-          "ec2:*",
-          "iam:*",
-          "rds:*"
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
         ]
         Resource = "*"
       },
@@ -229,6 +185,69 @@ resource "aws_iam_role_policy" "misconfigured_policy" {
 resource "aws_iam_instance_profile" "misconfigured_profile" {
   name = "MisconfiguredProfile"
   role = aws_iam_role.misconfigured_role.name
+
+  tags = {
+    Name             = "MisconfiguredProfile"
+    Environment      = "SecurityTesting"
+    Purpose          = "Intentionally vulnerable for testing"
+    SecurityRisk     = "high"
+    MonitoringTarget = "true"
+  }
+}
+
+# Launch template referencing the secured IAM instance profile
+resource "aws_launch_template" "secure_lt" {
+  name_prefix   = "secure-lt-"
+  image_id      = data.aws_ami.amazon_linux.id
+  instance_type = "t2.micro"
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.misconfigured_profile.name
+  }
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
+  monitoring {
+    enabled = true
+  }
+
+  network_interfaces {
+    associate_public_ip_address = false
+    security_groups             = [aws_security_group.misconfigured_sg.id]
+  }
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      volume_type           = "gp2"
+      volume_size           = 8
+      encrypted             = true
+      delete_on_termination = true
+    }
+  }
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name             = "SecureLaunchTemplateInstance"
+      Environment      = "SecurityTesting"
+      Purpose          = "Intentionally vulnerable for testing"
+      SecurityRisk     = "high"
+      MonitoringTarget = "true"
+    }
+  }
+
+  tags = {
+    Name             = "SecureLaunchTemplate"
+    Environment      = "SecurityTesting"
+    Purpose          = "Intentionally vulnerable for testing"
+    SecurityRisk     = "high"
+    MonitoringTarget = "true"
+  }
 }
 
 # Output important information
@@ -248,6 +267,14 @@ output "security_group_id" {
   value = aws_security_group.misconfigured_sg.id
 }
 
+output "launch_template_id" {
+  value = aws_launch_template.secure_lt.id
+}
+
+output "iam_role_arn" {
+  value = aws_iam_role.misconfigured_role.arn
+}
+
 output "security_warnings" {
-  value = "WARNING: This EC2 instance is intentionally misconfigured with public access, weak security groups, unencrypted storage, and hardcoded credentials!"
+  value = "WARNING: This EC2 instance is intentionally misconfigured with public access. IAM role, instance profile, launch template, security groups, encryption, and monitoring have been hardened per security remediation guidance."
 }
