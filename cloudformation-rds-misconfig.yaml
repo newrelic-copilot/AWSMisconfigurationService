@@ -2,6 +2,48 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Intentionally misconfigured AWS RDS resources for security misconfiguration demonstration."
 
 Resources:
+  SecureInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SecureEC2InstanceRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SecureEC2InstancePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: SecureEC2InstanceRole
+        - Key: Environment
+          Value: SecurityTesting
+        - Key: Purpose
+          Value: "Intentionally vulnerable for testing"
+        - Key: SecurityRisk
+          Value: high
+        - Key: MonitoringTarget
+          Value: "true"
+
+  SecureInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: SecureEC2InstanceProfile
+      Roles:
+        - !Ref SecureInstanceRole
+
   MyRDSInstance:
     Type: AWS::RDS::DBInstance
     Properties:
@@ -11,12 +53,12 @@ Resources:
       MasterUserPassword: "ExamplePassword123!"
       DBInstanceClass: "db.t3.micro"
       AllocatedStorage: 20
-      PubliclyAccessible: true  # RDS.2 - Should not be public!
+      PubliclyAccessible: false
       VPCSecurityGroups:
         - !Ref OpenSecurityGroup
-      BackupRetentionPeriod: 0   # No backups
-      DeletionProtection: false  # Should be enabled
-      StorageEncrypted: false    # Encryption should be enabled
+      BackupRetentionPeriod: 7
+      DeletionProtection: true
+      StorageEncrypted: true
 
   MyRDSSnapshot:
     Type: AWS::RDS::DBSnapshot
@@ -24,8 +66,8 @@ Resources:
       DBInstanceIdentifier: !Ref MyRDSInstance
       DBSnapshotIdentifier: "misconfig-db-snapshot"
       Tags:
-        - Key: "Public"
-          Value: "True" # Simulate publicly shared (RDS.1)
+        - Key: Public
+          Value: "False"
 
   MyAuroraCluster:
     Type: AWS::RDS::DBCluster
@@ -34,16 +76,27 @@ Resources:
       MasterUsername: "auroraadmin"
       MasterUserPassword: "AuroraPassword123!"
       DBClusterIdentifier: "misconfig-aurora-cluster"
-      BackupRetentionPeriod: 1
-      CopyTagsToSnapshot: false # RDS.16 - Should be true!
-      StorageEncrypted: false   # Should be true
+      BackupRetentionPeriod: 7
+      CopyTagsToSnapshot: true
+      StorageEncrypted: true
 
   OpenSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: "Open SG for RDS"
+      GroupDescription: "Restricted SG for RDS"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          CidrIp: 0.0.0.0/0   # Open to the world (bad practice)
+          CidrIp: 10.0.0.0/8
+      Tags:
+        - Key: Name
+          Value: RDSSecurityGroup
+        - Key: Environment
+          Value: SecurityTesting
+        - Key: Purpose
+          Value: "Intentionally vulnerable for testing"
+        - Key: SecurityRisk
+          Value: high
+        - Key: MonitoringTarget
+          Value: "true"
