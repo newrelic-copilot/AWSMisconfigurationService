@@ -1,5 +1,5 @@
 # Intentionally Misconfigured S3 Bucket - FOR SECURITY TESTING ONLY
-# This file contains multiple security misconfigurations and should NOT be used in production
+# This file has been remediated to address critical security misconfigurations
 
 terraform {
   required_providers {
@@ -29,21 +29,21 @@ resource "random_id" "bucket_suffix" {
   byte_length = 8
 }
 
-# MISCONFIGURATION 1: Public access block disabled (allows public access)
+# FIX 1: Public access block enabled (prevents public access)
 resource "aws_s3_bucket_public_access_block" "misconfigured_pab" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-# MISCONFIGURATION 2: Public read/write ACL
+# FIX 2: Private ACL (no public read/write)
 resource "aws_s3_bucket_acl" "misconfigured_acl" {
   depends_on = [aws_s3_bucket_ownership_controls.s3_bucket_acl_ownership]
   bucket     = aws_s3_bucket.misconfigured_bucket.id
-  acl        = "public-read-write"
+  acl        = "private"
 }
 
 resource "aws_s3_bucket_ownership_controls" "s3_bucket_acl_ownership" {
@@ -53,39 +53,64 @@ resource "aws_s3_bucket_ownership_controls" "s3_bucket_acl_ownership" {
   }
 }
 
-# MISCONFIGURATION 3: No server-side encryption
-# (Default encryption is intentionally not configured)
-
-# MISCONFIGURATION 4: No versioning enabled
-resource "aws_s3_bucket_versioning" "misconfigured_versioning" {
+# FIX 3: Server-side encryption enabled
+resource "aws_s3_bucket_server_side_encryption_configuration" "bucket_encryption" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
-  versioning_configuration {
-    status = "Disabled"
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
   }
 }
 
-# MISCONFIGURATION 5: No access logging
-# (Logging is intentionally not configured)
+# FIX 4: Versioning enabled to prevent irreversible data loss
+resource "aws_s3_bucket_versioning" "misconfigured_versioning" {
+  bucket = aws_s3_bucket.misconfigured_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
 
-# MISCONFIGURATION 6: Public bucket policy allowing full access
+# FIX 5: Access logging enabled
+resource "aws_s3_bucket_logging" "bucket_logging" {
+  bucket        = aws_s3_bucket.misconfigured_bucket.id
+  target_bucket = aws_s3_bucket.misconfigured_bucket.id
+  target_prefix = "access-logs/"
+}
+
+# FIX 6: Restrictive bucket policy - deny public access and high-risk actions
 resource "aws_s3_bucket_policy" "misconfigured_policy" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
+  depends_on = [aws_s3_bucket_public_access_block.misconfigured_pab]
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadWrite"
-        Effect    = "Allow"
+        Sid       = "DenyPublicAccess"
+        Effect    = "Deny"
         Principal = "*"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
+        Action    = "s3:*"
         Resource = [
           aws_s3_bucket.misconfigured_bucket.arn,
+          "${aws_s3_bucket.misconfigured_bucket.arn}/*",
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
+      {
+        Sid       = "DenyBulkDelete"
+        Effect    = "Deny"
+        Principal = "*"
+        Action = [
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion",
+        ]
+        Resource = [
           "${aws_s3_bucket.misconfigured_bucket.arn}/*",
         ]
       },
@@ -103,5 +128,5 @@ output "bucket_domain_name" {
 }
 
 output "security_warnings" {
-  value = "WARNING: This bucket is intentionally misconfigured with public access, no encryption, and no versioning!"
+  value = "INFO: This bucket has been remediated with public access blocked, versioning enabled, encryption enabled, and restrictive bucket policy applied."
 }
