@@ -14,6 +14,8 @@ provider "aws" {
   region = "us-east-2"
 }
 
+data "aws_caller_identity" "current" {}
+
 # Misconfigured S3 Bucket with public access
 resource "aws_s3_bucket" "misconfigured_bucket" {
   bucket = "my-misconfigured-bucket-${random_id.bucket_suffix.hex}"
@@ -72,12 +74,13 @@ resource "aws_s3_bucket_versioning" "misconfigured_versioning" {
   }
 }
 
-# FIX 5: Access logging enabled
-resource "aws_s3_bucket_logging" "bucket_logging" {
-  bucket        = aws_s3_bucket.misconfigured_bucket.id
-  target_bucket = aws_s3_bucket.misconfigured_bucket.id
-  target_prefix = "access-logs/"
-}
+# FIX 5: Access logging - target_bucket should be a dedicated, separate logging bucket
+# (configure a separate logging bucket in your environment and reference it here)
+# resource "aws_s3_bucket_logging" "bucket_logging" {
+#   bucket        = aws_s3_bucket.misconfigured_bucket.id
+#   target_bucket = "<dedicated-logging-bucket-id>"
+#   target_prefix = "access-logs/"
+# }
 
 # FIX 6: Restrictive bucket policy - deny public access and high-risk actions
 resource "aws_s3_bucket_policy" "misconfigured_policy" {
@@ -113,6 +116,11 @@ resource "aws_s3_bucket_policy" "misconfigured_policy" {
         Resource = [
           "${aws_s3_bucket.misconfigured_bucket.arn}/*",
         ]
+        Condition = {
+          StringNotEquals = {
+            "aws:PrincipalAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
       },
     ]
   })
