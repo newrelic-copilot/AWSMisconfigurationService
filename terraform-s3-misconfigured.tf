@@ -16,7 +16,7 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
-# Misconfigured S3 Bucket with public access
+# Remediated S3 Bucket - public access blocked and security controls applied
 resource "aws_s3_bucket" "misconfigured_bucket" {
   bucket = "my-misconfigured-bucket-${random_id.bucket_suffix.hex}"
 
