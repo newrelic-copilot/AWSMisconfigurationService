@@ -85,7 +85,6 @@ resource "aws_s3_bucket_versioning" "misconfigured_versioning" {
 # FIX 6: Restrictive bucket policy - deny public access and high-risk actions
 resource "aws_s3_bucket_policy" "misconfigured_policy" {
   bucket = aws_s3_bucket.misconfigured_bucket.id
-  depends_on = [aws_s3_bucket_public_access_block.misconfigured_pab]
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -97,7 +96,7 @@ resource "aws_s3_bucket_policy" "misconfigured_policy" {
         Action    = "s3:*"
         Resource = [
           aws_s3_bucket.misconfigured_bucket.arn,
-          "${aws_s3_bucket.misconfigured_bucket.arn}/*",
+          "${aws_s3_bucket.misconfigured_bucket.arn}/*"
         ]
         Condition = {
           Bool = {
@@ -111,17 +110,17 @@ resource "aws_s3_bucket_policy" "misconfigured_policy" {
         Principal = "*"
         Action = [
           "s3:DeleteObject",
-          "s3:DeleteObjectVersion",
+          "s3:DeleteObjectVersion"
         ]
         Resource = [
-          "${aws_s3_bucket.misconfigured_bucket.arn}/*",
+          "${aws_s3_bucket.misconfigured_bucket.arn}/*"
         ]
         Condition = {
           StringNotEquals = {
             "aws:PrincipalAccount" = data.aws_caller_identity.current.account_id
           }
         }
-      },
+      }
     ]
   })
 }
