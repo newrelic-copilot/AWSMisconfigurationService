@@ -91,7 +91,7 @@ resource "aws_s3_bucket_policy" "misconfigured_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "DenyPublicAccess"
+        Sid       = "EnforceHTTPS"
         Effect    = "Deny"
         Principal = "*"
         Action    = "s3:*"
@@ -106,7 +106,7 @@ resource "aws_s3_bucket_policy" "misconfigured_policy" {
         }
       },
       {
-        Sid       = "DenyBulkDelete"
+        Sid       = "DenyDeleteFromExternalAccounts"
         Effect    = "Deny"
         Principal = "*"
         Action = [
